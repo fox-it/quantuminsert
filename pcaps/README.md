@@ -7,7 +7,7 @@ Example pcaps containing `QUANTUMINSERT` attacks created in a controlled environ
 
 curl jsonip.com
 -----------------------
-We shot on our client make a request to `jsonip.com`. The payload is a simple textual payload containing `BANG!`. We shot on the SYN+ACK of the server.
+We shot on our client making a request to `jsonip.com` using curl. The payload is a simple textual payload containing `BANG!`. We shot on the SYN+ACK of the server.
 
  * [qi_local_SYNACK_curl_jsonip.pcap](qi_local_SYNACK_curl_jsonip.pcap)
  
@@ -27,12 +27,12 @@ The `Content-Length: 0` header ensures that the original response is ignored aft
 
 302 HTTP Redirects
 -------------------
-The following pcaps contain a HTTP 302 redirect to `http://www.fox-it.com`, which we shot on SYN+ACK of `slashdot.org` and `www.linkedin.com`. The browser was succesfully redirected as can be seen in the pcaps.
+The following pcaps contains a HTTP 302 redirect to `http://www.fox-it.com`, which we shot on the SYN+ACK of `slashdot.org` and `www.linkedin.com`. The browser was succesfully redirected as can be seen in the pcaps.
 
  * [qi_local_SYNACK_linkedin_redirect.pcap](qi_local_SYNACK_linkedin_redirect.pcap)
  * [qi_local_SYNACK_slashdot_redirect.pcap](qi_local_SYNACK_slashdot_redirect.pcap)
  
-The following is also a redirect, but shot on the client's actual HTTP GET request after checking the unique identifier in the `Cookie` header:
+The following pcap is also a redirect, but shot on the client's actual HTTP GET request after checking the unique identifier in the `Cookie` header:
 
  * [qi_local_GET_slashdot_redirect.pcap](qi_local_GET_slashdot_redirect.pcap)
 
@@ -41,7 +41,7 @@ The `Content-Length: 0` header ensures that the original response is ignored aft
 Malicious Javascript
 --------------------
 The following pcap contains a malicious javascript response that is inserted when the browser visits `imgur.com`.
-The shot is done on the SYN+ACK of the following url `http://platform.twitter.com/widgets.js` that is included by imgur.com.
+The shot is done on the SYN+ACK of the following url `http://platform.twitter.com/widgets.js`, which is loaded by imgur.com.
 
  * [qi_local_SYNACK_imgur_qdp.pcap](qi_local_SYNACK_imgur_qdp.pcap)
 

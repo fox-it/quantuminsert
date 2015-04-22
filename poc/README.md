@@ -23,7 +23,7 @@ The information is sent to the shooter using a single UDP packet. However, one c
 
 	stdbuf --output=0 |	tcpdump -nn -i eth0 "host jsonip.com and tcp[tcpflags]=(tcp-syn|tcp-ack)" | python monitor.py -s 10.0.0.2
 	
-`stdbuf` is needed as `tcpdump` will buffer it's output by default. The bpf filter is so output only the the SYN+ACK of `jsonip.com`, which will be outputted and parsed by `monitor.py`. The shooter is then notified on `10.0.0.2`.
+`stdbuf` is needed as `tcpdump` will buffer it's output by default. The bpf filter ensures that we only see the SYN+ACK of `jsonip.com`, which will be printed to stdout and parsed by `monitor.py`. The shooter is then notified on `10.0.0.2`.
 
 #### Example usage for tshark
 
@@ -38,9 +38,9 @@ Example command:
 		-o tcp.relative_sequence_numbers:0 -R http.request \
 		'host jsonip.com and port 80' | python monitor.py -s 10.0.0.2 --tshark
 		
-This command will output the required fields when one makes a HTTP request to `jsonip.com`. The outputted cookie and host field could be used as selectors in the monitor script.
+This command will output the required fields when someone makes a HTTP request to `jsonip.com`. The outputted cookie and host fields could be used as selectors in the monitor script.
 
-`-o tcp.relative_sequence_numbers:0` is need to get absolute sequence numbers.
+The `-o tcp.relative_sequence_numbers:0` option is needed to output non relative sequence numbers.
 
 shooter.py
 ----------
