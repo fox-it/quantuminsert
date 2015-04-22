@@ -1,0 +1,428 @@
+diff --git a/src/generators.h b/src/generators.h
+index b2ccc80..1ea43b1 100644
+--- a/src/generators.h
++++ b/src/generators.h
+@@ -429,6 +429,7 @@ enum {
+ #define     STREAM_DATA_AFTER_RST_RCVD            18
+ #define     STREAM_WINDOW_SLAM                    19
+ #define     STREAM_NO_3WHS                        20
++#define     STREAM_QUANTUM_INSERT                 21
+ 
+ #define GENERATOR_DNS                             131
+ #define     DNS_EVENT_OBSOLETE_TYPES                1
+@@ -586,6 +587,7 @@ enum {
+ #define STREAM_DATA_AFTER_RST_RCVD_STR "Data sent on stream after TCP Reset received"
+ #define STREAM_WINDOW_SLAM_STR "TCP window closed before receiving data"
+ #define STREAM_NO_3WHS_STR "TCP session without 3-way handshake"
++#define STREAM_QUANTUM_INSERT_STR "Possible Quantum Insert"
+ 
+ #define STREAM_INTERNAL_EVENT_STR ""
+ 
+diff --git a/src/preprocessors/Stream6/snort_stream_tcp.c b/src/preprocessors/Stream6/snort_stream_tcp.c
+index e8df5c1..0708334 100644
+--- a/src/preprocessors/Stream6/snort_stream_tcp.c
++++ b/src/preprocessors/Stream6/snort_stream_tcp.c
+@@ -49,6 +49,8 @@
+ #include <errno.h>
+ #include <assert.h>
+ 
++#include "Unified2_common.h"
++
+ #ifdef HAVE_CONFIG_H
+ #include "config.h"
+ #endif
+@@ -202,6 +204,7 @@ extern PreprocStats preprocRuleOptionPerfStats;
+ #define EVENT_BAD_ACK                   0x00008000
+ #define EVENT_DATA_AFTER_RST_RCVD       0x00010000
+ #define EVENT_WINDOW_SLAM               0x00020000
++#define EVENT_QUANTUM_INSERT            0x00040000
+ 
+ #define TF_NONE                     0x0000
+ #define TF_WSCALE                   0x0001
+@@ -386,6 +389,12 @@ typedef struct _StreamTracker
+     // TBD move out of here since only used per packet?
+     StreamSegment* seglist_next;  /* next queued segment to flush */
+ 
++    // Keep track of acked/purged segments, configurable with `max_track_old_segs`
++    StreamSegment *qi_seglist;       /* first queued segment */
++    StreamSegment *qi_seglist_tail;  /* last queued segment */
++    StreamSegment *qi_inserted_seg;  /* the inconsistent segment, used for extra_data */
++    uint32_t qi_seg_count;           /* number of current queued segments */
++
+ #ifdef DEBUG
+     int segment_ordinal;
+ #endif
+@@ -1391,6 +1400,7 @@ StreamTcpPolicy *StreamTcpPolicyClone( StreamTcpPolicy *master )
+     clone->max_consec_small_segs = master->max_consec_small_segs;
+     clone->max_consec_small_seg_size = master->max_consec_small_seg_size;
+     memcpy(clone->small_seg_ignore, master->small_seg_ignore, sizeof(master->small_seg_ignore));
++    clone->max_track_old_segs = master->max_track_old_segs;
+ 
+     config = (StreamConfig *) sfPolicyUserDataGet(stream_online_config, getParserPolicy( snort_conf ));
+     addStreamTcpPolicyToList( config->tcp_config, clone );
+@@ -1533,6 +1543,39 @@ static inline uint16_t GetTcpReassemblyPolicy(int os_policy)
+ 
+ #define STATIC_FP ((s5TcpPolicy->flags & STREAM_CONFIG_STATIC_FLUSHPOINTS)?1:0)
+ 
++static int GetQuantumPacket(void *ssn_ptr, uint8_t **buf, uint32_t *len, uint32_t *type)
++{
++    SessionControlBlock* scb = NULL;
++    TcpSession *tcpssn = NULL;
++    StreamTracker *listener = NULL;
++    StreamSegment *seg = NULL;
++
++    if (ssn_ptr == NULL)
++        return 0;
++
++    scb = (SessionControlBlock*) ssn_ptr;
++    if (scb->proto_specific_data)
++        tcpssn = (TcpSession *)scb->proto_specific_data->data;
++
++    if (tcpssn == NULL)
++        return 0;
++
++    listener = &tcpssn->client;
++    seg = listener->qi_inserted_seg;
++
++    if (seg == NULL)
++        return 0;
++
++    *buf = (uint8_t *)seg->data;
++    *len = seg->size;
++    *type = EVENT_INFO_GENERIC_DATA;
++
++    listener->qi_inserted_seg = NULL;
++
++    return 1;
++}
++
++
+ static void StreamParseTcpArgs(struct _SnortConfig *sc, StreamTcpConfig *config, char *args, StreamTcpPolicy *s5TcpPolicy)
+ {
+     char **toks;
+@@ -1559,6 +1602,10 @@ static void StreamParseTcpArgs(struct _SnortConfig *sc, StreamTcpConfig *config,
+     s5TcpPolicy->max_consec_small_segs = STREAM_DEFAULT_CONSEC_SMALL_SEGS;
+     s5TcpPolicy->max_consec_small_seg_size = STREAM_DEFAULT_MAX_SMALL_SEG_SIZE;
+ 
++    s5TcpPolicy->max_track_old_segs = STREAM_DEFAULT_TRACK_OLD_SEGS;
++    if (stream_api)
++        s5TcpPolicy->xtra_quantum_id = stream_api->reg_xtra_data_cb(GetQuantumPacket);
++
+     if(args != NULL && strlen(args) != 0)
+     {
+         toks = mSplit(args, ",", 0, &num_toks, 0);
+@@ -1830,6 +1877,37 @@ static void StreamParseTcpArgs(struct _SnortConfig *sc, StreamTcpConfig *config,
+                 }
+                 max_s_toks = 2;
+             }
++            else if(!strcasecmp(stoks[0], "max_track_old_segs"))
++            {
++                if(stoks[1])
++                {
++                    long_val = SnortStrtol(stoks[1], &endPtr, 10);
++                    if (errno == ERANGE)
++                    {
++                        errno = 0;
++                        FatalError("%s(%d) => Invalid Max Track Old Segments.  Integer parameter required.\n",
++                                file_name, file_line);
++                    }
++                    s5TcpPolicy->max_track_old_segs = (uint32_t)long_val;
++                }
++
++                if (!stoks[1] || (endPtr == &stoks[1][0]))
++                {
++                    FatalError("%s(%d) => Invalid Max Track Old Segments.  Integer parameter required.\n",
++                            file_name, file_line);
++                }
++
++                if (((long_val > STREAM_MAX_MAX_TRACK_OLD_SEGS) ||
++                            (long_val < STREAM_MIN_MAX_TRACK_OLD_SEGS)) &&
++                        (long_val != 0))
++                {
++                    FatalError("%s(%d) => Invalid Max Track Old Segments."
++                            "  Must be 0 (disabled) or between %d and %d\n",
++                            file_name, file_line,
++                            STREAM_MAX_MAX_TRACK_OLD_SEGS, STREAM_MIN_MAX_TRACK_OLD_SEGS);
++                }
++                max_s_toks = 2;
++            }
+             else if (!strcasecmp(stoks[0], "small_segments"))
+             {
+                 char **ptoks;
+@@ -2309,6 +2387,11 @@ static void StreamPrintTcpConfig(StreamTcpPolicy *s5TcpPolicy)
+         LogMessage("    Maximum number of segs to queue per session: %d\n",
+                 s5TcpPolicy->max_queued_segs);
+     }
++    if (s5TcpPolicy->max_track_old_segs != 0)
++    {
++        LogMessage("    Maximum number of old segs to track per session: %d\n",
++                s5TcpPolicy->max_track_old_segs);
++    }
+     if (s5TcpPolicy->flags)
+     {
+         LogMessage("    Options:\n");
+@@ -3024,6 +3107,22 @@ static inline void EventNo3whs (StreamTcpPolicy *s5TcpPolicy)
+             NULL);                              /* rule info ptr */
+ }
+ 
++static inline void EventQuantumInsert (StreamTcpPolicy *s5TcpPolicy)
++{
++    // if(!(s5TcpPolicy->flags & STREAM_CONFIG_ENABLE_ALERTS))
++    //     return;
++
++    s5stats.events++;
++
++    SnortEventqAdd(GENERATOR_SPP_STREAM,        /* GID */
++            STREAM_QUANTUM_INSERT,              /* SID */
++            1,                                  /* rev */
++            0,                                  /* class */
++            3,                                  /* priority */
++            STREAM_QUANTUM_INSERT_STR,          /* event msg */
++            NULL);                              /* rule info ptr */
++}
++
+ /*
+  *  Utility functions for TCP stuff
+  */
+@@ -4064,6 +4163,10 @@ static inline void purge_all (StreamTracker *st)
+     st->seglist = st->seglist_tail = st->seglist_next = NULL;
+     st->seg_count = st->flush_count = 0;
+     st->seg_bytes_total = st->seg_bytes_logical = 0;
++
++    st->qi_seg_count = 0;
++    DeleteSeglist(st->qi_seglist);
++    st->qi_seglist = st->qi_seglist_tail = st->qi_inserted_seg = NULL;
+ }
+ 
+ // purge_flushed_ackd():
+@@ -6046,6 +6149,69 @@ static inline StreamSegment *FindSegment(StreamTracker *st, uint32_t pkt_seq)
+     return NULL;
+ }
+ 
++static inline StreamSegment *FindOldSegment(StreamTracker *st, uint32_t pkt_seq)
++{
++    int32_t dist_head;
++    int32_t dist_tail;
++    StreamSegment *ss;
++
++    if (!st->qi_seglist)
++        return NULL;
++
++    dist_head = pkt_seq - st->qi_seglist->seq;
++    dist_tail = pkt_seq - st->qi_seglist_tail->seq;
++
++    if (dist_head <= dist_tail)
++    {
++        /* Start iterating at the head (left) */
++        for (ss = st->qi_seglist; ss; ss = ss->next)
++        {
++            if (SEQ_EQ(ss->seq, pkt_seq))
++                return ss;
++
++            if (SEQ_GEQ(ss->seq, pkt_seq))
++                break;
++        }
++    }
++    else
++    {
++        /* Start iterating at the tail (right) */
++        for (ss = st->qi_seglist_tail; ss; ss = ss->prev)
++        {
++            if (SEQ_EQ(ss->seq, pkt_seq))
++                return ss;
++
++            if (SEQ_LT(ss->seq, pkt_seq))
++                break;
++        }
++    }
++    return NULL;
++}
++
++static inline int CheckQuantumInsert(StreamTracker *listener,
++        TcpDataBlock *tdb,
++        Packet *p)
++{
++    int ret = 0;
++    StreamSegment* seg = NULL;
++
++    if (listener->seglist_tail && tdb->seq <= listener->seglist_tail->seq) {
++        seg = FindSegment(listener, tdb->seq);
++    }
++    if (seg == NULL && listener->qi_seglist_tail && tdb->seq <= listener->qi_seglist_tail->seq) {
++        seg = FindOldSegment(listener, tdb->seq);
++    }
++    if (seg) {
++        // compare smallest segment size
++        if (memcmp(p->data, seg->data, MIN(p->dsize, seg->size)) != 0) {
++            listener->qi_inserted_seg = seg;
++            SetExtraData(p, listener->tcp_policy->xtra_quantum_id);
++            ret |= EVENT_QUANTUM_INSERT;
++        }
++    }
++    return ret;
++}
++
+ void StreamTcpSessionClear(Packet *p)
+ {
+     SessionControlBlock *scb;
+@@ -7344,8 +7510,10 @@ static int ProcessTcpData(Packet *p, StreamTracker *listener, TcpSession *tcpssn
+         {
+             if ( !(tcpssn->scb->ha_state.session_flags & SSNFLAG_STREAM_ORDER_BAD) )
+             {
+-                if ( !SEQ_LEQ((tdb->seq + p->dsize), listener->r_nxt_ack) )
++                if ( !SEQ_LEQ((tdb->seq + p->dsize), listener->r_nxt_ack) ) {
+                     tcpssn->scb->ha_state.session_flags |= SSNFLAG_STREAM_ORDER_BAD;
++                    CheckQuantumInsert(listener, tdb, p);
++                }
+             }
+             ProcessTcpStream(listener, tcpssn, p, tdb, s5TcpPolicy);
+         }
+@@ -8030,6 +8198,9 @@ static void LogTcpEvents(StreamTcpPolicy *s5TcpPolicy, int eventcode)
+ 
+     if (eventcode & EVENT_WINDOW_SLAM)
+         EventWindowSlam(s5TcpPolicy);
++
++    if (eventcode & EVENT_QUANTUM_INSERT)
++        EventQuantumInsert(s5TcpPolicy);
+ }
+ 
+ static inline void DisableInspection (SessionControlBlock *scb, Packet* p, char ignore)
+@@ -9027,6 +9198,8 @@ static int ProcessTcp(SessionControlBlock *scb, Packet *p, TcpDataBlock *tdb,
+             if ((p->tcph->th_flags != 0) || (s5TcpPolicy->policy == STREAM_POLICY_LINUX) || (s5TcpPolicy->policy == STREAM_POLICY_NOACK))
+             {
+                 ProcessTcpData(p, listener, tcpssn, tdb, s5TcpPolicy);
++                if (listener->qi_inserted_seg)
++                    eventcode |= EVENT_QUANTUM_INSERT;
+             }
+             else
+             {
+@@ -9856,8 +10029,46 @@ static int StreamSeglistDeleteNode (StreamTracker* st, StreamSegment* seg)
+     if ( st->seglist_next == seg )
+         st->seglist_next = NULL;
+ 
+-    SegmentFree(seg);
+-    st->seg_count--;
++    // Keep track of `max_track_old_segs` segments
++    if (st->tcp_policy->max_track_old_segs) {
++        StreamSegment* prev = st->qi_seglist_tail;
++        StreamSegment* new = seg;
++        if(prev)
++        {
++            new->next = prev->next;
++            new->prev = prev;
++            prev->next = new;
++            if (new->next)
++                new->next->prev = new;
++            else
++                st->qi_seglist_tail = new;
++        }
++        else
++        {
++            new->next = st->qi_seglist;
++            if(new->next)
++                new->next->prev = new;
++            else
++                st->qi_seglist_tail = new;
++            st->qi_seglist = new;
++        }
++
++        st->qi_seg_count++;
++        while (st->qi_seg_count > st->tcp_policy->max_track_old_segs) {
++            StreamSegment* old = st->qi_seglist;
++            st->qi_seglist = st->qi_seglist->next;
++            if (st->qi_seglist)
++                st->qi_seglist->prev = NULL;
++            if (st->qi_seglist == NULL)
++                st->qi_seglist_tail = NULL;
++            SegmentFree(old);
++            st->qi_seg_count--;
++            st->seg_count--;
++        }
++    } else {
++        SegmentFree(seg);
++        st->seg_count--;
++    }
+ 
+     return ret;
+ }
+diff --git a/src/preprocessors/Stream6/stream_common.h b/src/preprocessors/Stream6/stream_common.h
+index 10df88f..0dddbb5 100644
+--- a/src/preprocessors/Stream6/stream_common.h
++++ b/src/preprocessors/Stream6/stream_common.h
+@@ -70,6 +70,10 @@
+ #define STREAM_MAX_CONSEC_SMALL_SEGS 2048      /* 2048 single byte packets without acks is alot */
+ #define STREAM_MIN_CONSEC_SMALL_SEGS 0         /* 0 means disabled */
+ 
++#define STREAM_DEFAULT_TRACK_OLD_SEGS 10       /* keep track of 10 old TCP segments */
++#define STREAM_MIN_MAX_TRACK_OLD_SEGS 0        /* 0 means disabled */
++#define STREAM_MAX_MAX_TRACK_OLD_SEGS 2048     /* history of 2048 segments should be enough */
++
+ #if defined(FEAT_OPEN_APPID)
+ #define MAX_APP_PROTOCOL_ID  4
+ #endif /* defined(FEAT_OPEN_APPID) */
+@@ -203,6 +207,10 @@ typedef struct _StreamTcpPolicy
+ 
+     uint32_t   max_consec_small_segs;
+     uint32_t   max_consec_small_seg_size;
++
++    uint32_t   max_track_old_segs;
++    uint32_t   xtra_quantum_id;
++
+     char       small_seg_ignore[MAX_PORTS/8];
+ 
+ } StreamTcpPolicy;
+diff --git a/src/sfutil/Unified2_common.h b/src/sfutil/Unified2_common.h
+index d8f48c7..1398d2a 100644
+--- a/src/sfutil/Unified2_common.h
++++ b/src/sfutil/Unified2_common.h
+@@ -193,7 +193,8 @@ typedef enum _EventInfoEnum
+     EVENT_INFO_HTTP_HOSTNAME,
+     EVENT_INFO_IPV6_SRC,
+     EVENT_INFO_IPV6_DST,
+-    EVENT_INFO_JSNORM_DATA
++    EVENT_INFO_JSNORM_DATA,
++    EVENT_INFO_GENERIC_DATA
+ }EventInfoEnum;
+ 
+ typedef enum _EventDataType
+diff --git a/tools/u2openappid/u2openappid.c b/tools/u2openappid/u2openappid.c
+index c9dd945..d2a46b1 100644
+--- a/tools/u2openappid/u2openappid.c
++++ b/tools/u2openappid/u2openappid.c
+@@ -295,6 +295,11 @@ static void extradata_dump(u2record *record) {
+                 len, record->data + sizeof(Unified2ExtraDataHdr) + sizeof(SerialUnified2ExtraData));
+             break;
+ 
++        case EVENT_INFO_GENERIC_DATA:
++            printf("Generic Data:\n");
++            LogBuffer(record->data + sizeof(Unified2ExtraDataHdr) + sizeof(SerialUnified2ExtraData), len);
++            break;
++
+         case EVENT_INFO_SMTP_FILENAME:
+             printf("SMTP Attachment Filename: %.*s\n",
+                 len,record->data + sizeof(Unified2ExtraDataHdr) + sizeof(SerialUnified2ExtraData));
+diff --git a/tools/u2spewfoo/u2spewfoo.c b/tools/u2spewfoo/u2spewfoo.c
+index c3f6c0f..e91034d 100644
+--- a/tools/u2spewfoo/u2spewfoo.c
++++ b/tools/u2spewfoo/u2spewfoo.c
+@@ -43,6 +43,8 @@
+ 
+ #include "Unified2_common.h"
+ 
++static void LogBuffer (const uint8_t* p, unsigned n);
++
+ #define SUCCESS 314159265
+ #define STEVE -1
+ #define FAILURE STEVE
+@@ -296,6 +298,11 @@ static void extradata_dump(u2record *record) {
+                 len, record->data + sizeof(Unified2ExtraDataHdr) + sizeof(SerialUnified2ExtraData));
+             break;
+ 
++        case EVENT_INFO_GENERIC_DATA:
++            printf("Generic Data:\n");
++            LogBuffer(record->data + sizeof(Unified2ExtraDataHdr) + sizeof(SerialUnified2ExtraData), len);
++            break;
++
+         case EVENT_INFO_SMTP_FILENAME:
+             printf("SMTP Attachment Filename: %.*s\n",
+                 len,record->data + sizeof(Unified2ExtraDataHdr) + sizeof(SerialUnified2ExtraData));
