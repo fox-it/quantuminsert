@@ -10,7 +10,7 @@ PCAPS
 -----
 PCAP data for research and testing purposes can be found here:
 
-[https://github.com/fox-it/quantuminsert/pcaps](https://github.com/fox-it/quantuminsert/pcaps)
+[https://github.com/fox-it/quantuminsert/tree/master/pcaps](https://github.com/fox-it/quantuminsert/tree/master/pcaps)
 
 Detection
 ---------
@@ -18,10 +18,10 @@ We made proof of concept detection capabilities for Bro and Snort to detect `QUA
 
 For more information:
 
-[https://github.com/fox-it/quantuminsert/detection](https://github.com/fox-it/quantuminsert/detection)
+[https://github.com/fox-it/quantuminsert/tree/master/detection](https://github.com/fox-it/quantuminsert/tree/master/detection)
 
 Tools
 -----
 The tools that we used to simulate and perform `QUANTUMINSERT` can be found here:
 
-[https://github.com/fox-it/quantuminsert/poc](https://github.com/fox-it/quantuminsert/poc)
+[https://github.com/fox-it/quantuminsert/tree/master/poc](https://github.com/fox-it/quantuminsert/tree/master/poc)
