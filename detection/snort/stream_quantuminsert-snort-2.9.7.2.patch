@@ -253,7 +253,7 @@ index e8df5c1..0708334 100644
 +    }
 +    if (seg) {
 +        // compare smallest segment size
-+        if (memcmp(p->data, seg->data, MIN(p->dsize, seg->size)) != 0) {
++        if (memcmp(p->data, seg->payload, MIN(p->dsize, seg->size)) != 0) {
 +            listener->qi_inserted_seg = seg;
 +            SetExtraData(p, listener->tcp_policy->xtra_quantum_id);
 +            ret |= EVENT_QUANTUM_INSERT;
