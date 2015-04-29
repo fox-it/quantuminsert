@@ -1,42 +1,72 @@
 Quantum Insert detection for Bro-IDS
 ===================================
 
-Fox-IT made a proof of concept policy for Bro-IDS to detect `QUANTUMINSERT` attacks.
+Fox-IT made a proof of concept policy for Bro-IDS to detect `QUANTUMINSERT` attacks. This policy using the `tcp_packet` event has now been deprecated in favour for a patch that improves the `rexmit_inconsistency` event.
 
-The Bro policy is released into the public domain.
+The README and the old policy utilizing the `tcp_packet` event can still be found [here](./old).
 
-Install
--------
+The patch was made for the latest stable version, `bro-2.3.2` and can be found here: [rexmit_inconsistency-bro-2.3.2.patch](./rexmit_inconsistency-bro-2.3.2.patch)
 
-Add the `qi.bro` policy to your `local.bro` file, eg:
+We hope it will be patched upstream as well.
 
-	@load qi.bro
+Patch for `rexmit_inconsistency`
+--------------------------------
 
-Testing
--------
+This patch fixes the `rexmit_inconsistency` event for Quantum Insert attacks. See also the Bro ticket ([BIT-1314](https://bro-tracker.atlassian.net/browse/BIT-1314)) regarding detection of `QUANTUM INSERT`.
 
-You can also run the policy directly on a pcap file:
+The patch improves the TCP_Reassembler class so that it can keep a history of old TCP segments. How many segments it will track can be configured using the
+`tcp_max_old_segments` option. A value of zero will disable it. We recommend setting it to a low number, such as 10:
 
-	bro --no-checksums -r ../pcaps/qi_putty_dl.pcap qi.bro
+```bro
+const tcp_max_old_segments = 10 &redef;
+```
 
-The policy will print hits to stdout and log to `notice.log`, example:
+This will mean that every TCP session will keep a maximum of 10 extra TCP segments in memory which is still reasonable.
 
-	POSSIBLE QI: sequence 1: 10.0.1.4:51358/tcp <- 46.43.34.31:80/tcp --
-	[HTTP/1.1 302 Found^M^JDate: Tue, 21 Apr 2015 00:41:55 GMT^M^JServer: Apache^M^JLocation: http://the.earth.li/~sgtatham/putty/0.64/x86/putty.exe^M^JContent-Length: 300^M^JKeep-Alive: timeout=15, max=100^M^JConnection: Keep-Alive^M^JContent-Type: text/html; charset=iso-8859-1^M^J^M^J<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">^J<html><head>^J<title>302 Found</title>^J</head><body>^J<h1>Found</h1>^J<p>The document has moved <a href="http://the.earth.li/~sgtatham/putty/0.64/x86/putty.exe">here</a>.</p>^J<hr>^J<address>Apache Server at the.earth.li Port 80</address>^J</body></html>^J]	
-	differs from	
-	[HTTP/1.1 302 Found^M^JLocation: http://www.7-zip.org/a/7z938.exe^M^JContent-Length: 0^M^J^M^J]
+An overlapping segment with different data can indicate a possible TCP injection attack. 
 
-Technical details of the policy
--------------------------------
-We initially thought we could trigger `weird.log` events using Bro on our pcaps containing a Quantum Insert like attack.
-Especially as Bro has an event called `rexmit_inconsistency`. However this event seems not capable of detecting Quantum Insert as it does not keep a history of TCP segments.
+### Applying the patch
 
-Our Bro policy does not make use of this event, but rather tracks the first content carrying TCP packet. If another TCP packet claims to be the first content it will be compared.
-If they are different it will trigger an event.
+Unpack the Bro 2.3.2 source:
 
-Currently the policy uses a less ineffecient `tcp_packet` event.
-It should be feasible to make improvements to internals of Bro, to (optionally) keep track of a sliding window of (ACKed and/or unACKed) TCP segments.
-This way the `rexmit_inconsistency` event could make use of it and fire the event based on the sliding window.
+```shell
+tar -zxvf bro-2.3.2.tar.gz
+```
+	
+Apply the patch
+
+```shell
+git apply < rexmit_inconsistency-bro-2.3.2.patch
+```
+	
+Configure and make as normal.
+
+### Testing the patch
+
+You can use the following example policy for testing:
+
+```bro
+const tcp_max_old_segments = 10 &redef;
+event rexmit_inconsistency(c: connection, t1: string, t2: string)
+	{
+    print(fmt("POSSIBLE QUANTUM INSERT: %s: %s <> %s\n", c$id, t1, t2));
+	}
+```
+
+Save it as `test-qi-patch.bro` and test it against one of our QI pcaps:
+
+```shell
+bro --no-checksums -r qi_internet_SYNACK_curl_jsonip.pcap test-qi-patch.bro
+```
+
+You should see the following on stdout:
+
+	POSSIBLE QUANTUM INSERT: [orig_h=178.200.100.200, orig_p=39976/tcp, resp_h=96.126.98.124, resp_p=80/tcp]: HTTP/1.1 200 OK^M^JContent-Length: 5^M^J^M^JBANG! <> HTTP/1.1 200 OK^M^JServer: nginx/1.4.4^M^JDate:^J
+
+
+### Remarks
+The default `weirds.bro` already logs the `rexmit_inconsistency` event as `Conn::Retransmission_Inconsistency`.
+Just ensure that you define the `tcp_max_old_segments` variable in your Bro config, e.g. in `init-bare.bro`.
 
 
 References

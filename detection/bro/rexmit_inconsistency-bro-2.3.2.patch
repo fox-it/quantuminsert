@@ -1,0 +1,198 @@
+diff --git a/src/NetVar.cc b/src/NetVar.cc
+index 0a11a75..84f79cb 100644
+--- a/src/NetVar.cc
++++ b/src/NetVar.cc
+@@ -48,6 +48,7 @@ double tcp_partial_close_delay;
+ int tcp_max_initial_window;
+ int tcp_max_above_hole_without_any_acks;
+ int tcp_excessive_data_without_further_acks;
++int tcp_max_old_segments;
+ 
+ RecordType* socks_address;
+ 
+@@ -354,6 +355,7 @@ void init_net_var()
+ 		opt_internal_int("tcp_max_above_hole_without_any_acks");
+ 	tcp_excessive_data_without_further_acks =
+ 		opt_internal_int("tcp_excessive_data_without_further_acks");
++	tcp_max_old_segments = opt_internal_int("tcp_max_old_segments");
+ 
+ 	socks_address = internal_type("SOCKS::Address")->AsRecordType();
+ 
+diff --git a/src/NetVar.h b/src/NetVar.h
+index c726c79..7404b84 100644
+--- a/src/NetVar.h
++++ b/src/NetVar.h
+@@ -51,6 +51,7 @@ extern double tcp_reset_delay;
+ extern int tcp_max_initial_window;
+ extern int tcp_max_above_hole_without_any_acks;
+ extern int tcp_excessive_data_without_further_acks;
++extern int tcp_max_old_segments;
+ 
+ extern RecordType* socks_address;
+ 
+diff --git a/src/Reassem.cc b/src/Reassem.cc
+index 27fb265..fc984f2 100644
+--- a/src/Reassem.cc
++++ b/src/Reassem.cc
+@@ -34,12 +34,38 @@ uint64 Reassembler::total_size = 0;
+ Reassembler::Reassembler(uint64 init_seq, ReassemblerType arg_type)
+ 	{
+ 	blocks = last_block = 0;
++	old_blocks = last_old_block = 0;
++	total_old_blocks = max_old_blocks = 0;
+ 	trim_seq = last_reassem_seq = init_seq;
+ 	}
+ 
+ Reassembler::~Reassembler()
+ 	{
+ 	ClearBlocks();
++	ClearOldBlocks();
++	}
++
++void Reassembler::CheckOverlap(DataBlock *head, DataBlock *tail,
++		uint64 seq, uint64 len, const u_char* data)
++	{
++	if ( ! head || ! tail )
++		return;
++
++	if ( seq_between(seq, head->seq, tail->upper) )
++		{
++			for ( DataBlock* b = head; b; b = b->next )
++				{
++				if ( seq_between(seq, b->seq, b->upper) )
++					{
++					uint64 overlap_start = seq;
++					uint64 overlap_offset = overlap_start - b->seq;
++					uint64 new_b_len = len;
++					uint64 b_len = b->upper - overlap_start;
++					uint64 overlap_len = min(new_b_len, b_len);
++					Overlap(&b->block[overlap_offset], data, overlap_len);
++					}
++				}
++		}
+ 	}
+ 
+ void Reassembler::NewBlock(double t, uint64 seq, uint64 len, const u_char* data)
+@@ -49,6 +75,9 @@ void Reassembler::NewBlock(double t, uint64 seq, uint64 len, const u_char* data)
+ 
+ 	uint64 upper_seq = seq + len;
+ 
++	CheckOverlap( blocks, last_block, seq, len, data );
++	CheckOverlap( old_blocks, last_old_block, seq, len, data );
++
+ 	if ( upper_seq <= trim_seq )
+ 		// Old data, don't do any work for it.
+ 		return;
+@@ -119,7 +148,35 @@ uint64 Reassembler::TrimToSeq(uint64 seq)
+ 				num_missing += seq - blocks->upper;
+ 			}
+ 
+-		delete blocks;
++		if (max_old_blocks)
++			{
++			blocks->next = 0;
++			if (last_old_block)
++				{
++				blocks->prev = last_old_block;
++				last_old_block->next = blocks;
++				}
++			else
++				{
++				blocks->prev = 0;
++				old_blocks = blocks;
++				}
++
++			last_old_block = blocks;
++			total_old_blocks++;
++
++			while (old_blocks && total_old_blocks > max_old_blocks)
++				{
++				DataBlock* next = old_blocks->next;
++				delete old_blocks;
++				old_blocks = next;
++				total_old_blocks--;
++				}
++			}
++		else
++			{
++			delete blocks;
++			}
+ 
+ 		blocks = b;
+ 		}
+@@ -156,6 +213,18 @@ void Reassembler::ClearBlocks()
+ 	last_block = 0;
+ 	}
+ 
++void Reassembler::ClearOldBlocks()
++	{
++	while ( old_blocks )
++		{
++		DataBlock* b = old_blocks->next;
++		delete old_blocks;
++		old_blocks = b;
++		}
++
++	last_old_block = 0;
++	}
++
+ uint64 Reassembler::TotalSize() const
+ 	{
+ 	uint64 size = 0;
+diff --git a/src/Reassem.h b/src/Reassem.h
+index 7b77a62..f079203 100644
+--- a/src/Reassem.h
++++ b/src/Reassem.h
+@@ -37,6 +37,7 @@ public:
+ 
+ 	// Delete all held blocks.
+ 	void ClearBlocks();
++	void ClearOldBlocks();
+ 
+ 	int HasBlocks() const		{ return blocks != 0; }
+ 	uint64 LastReassemSeq() const	{ return last_reassem_seq; }
+@@ -51,6 +52,8 @@ public:
+ 	// Sum over all data buffered in some reassembler.
+ 	static uint64 TotalMemoryAllocation()	{ return total_size; }
+ 
++	void SetMaxOldBlocks(uint32 count)	{ max_old_blocks = count; }
++
+ protected:
+ 	Reassembler()	{ }
+ 
+@@ -66,11 +69,21 @@ protected:
+ 	DataBlock* AddAndCheck(DataBlock* b, uint64 seq,
+ 				uint64 upper, const u_char* data);
+ 
++	void CheckOverlap(DataBlock *head, DataBlock *tail,
++				uint64 seq, uint64 len, const u_char* data);
++
+ 	DataBlock* blocks;
+ 	DataBlock* last_block;
++
++	DataBlock* old_blocks;
++	DataBlock* last_old_block;
++
+ 	uint64 last_reassem_seq;
+ 	uint64 trim_seq;	// how far we've trimmed
+ 
++	uint32 max_old_blocks;
++	uint32 total_old_blocks;
++
+ 	static uint64 total_size;
+ };
+ 
+diff --git a/src/analyzer/protocol/tcp/TCP_Reassembler.cc b/src/analyzer/protocol/tcp/TCP_Reassembler.cc
+index 053e8c8..af00526 100644
+--- a/src/analyzer/protocol/tcp/TCP_Reassembler.cc
++++ b/src/analyzer/protocol/tcp/TCP_Reassembler.cc
+@@ -42,6 +42,9 @@ TCP_Reassembler::TCP_Reassembler(analyzer::Analyzer* arg_dst_analyzer,
+ 	seq_to_skip = 0;
+ 	in_delivery = false;
+ 
++	if ( tcp_max_old_segments )
++		SetMaxOldBlocks(tcp_max_old_segments);
++
+ 	if ( tcp_contents )
+ 		{
+ 		// Val dst_port_val(ntohs(Conn()->RespPort()), TYPE_PORT);
