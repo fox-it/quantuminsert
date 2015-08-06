@@ -25,3 +25,9 @@ Tools
 The tools that we used to simulate and perform `QUANTUMINSERT` can be found here:
 
 [https://github.com/fox-it/quantuminsert/tree/master/poc](https://github.com/fox-it/quantuminsert/tree/master/poc)
+
+Presentations
+-------------
+Talks we did on Quantum Insert.
+
+[BroCon2015](https://github.com/fox-it/quantuminsert/tree/master/presentations/brocon2015)

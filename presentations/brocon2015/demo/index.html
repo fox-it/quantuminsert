@@ -1,0 +1,562 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>The Bro Network Security Monitor</title>
+
+    <meta name="keywords" content="" />
+    <meta name="description" content="" />
+    <meta name="robots" content="index, follow" />
+    <meta name="google-site-verification" content="bK94NVHmf5qE0FyUFDJof5HalP0Dmwcglxpoowqsvcw" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+    <link rel="shortcut icon" href="https://www.bro.org/favicon.ico" />
+
+    <link type="text/css" rel="stylesheet" href="https://www.bro.org/css/pygments.css" media="screen" />
+    <link type="text/css" rel="stylesheet" href="https://www.bro.org/css/960.css" media="screen" /><!-- no need to edit, 960.gs Framework -->
+    <link type="text/css" rel="stylesheet" href="https://www.bro.org/css/bro-ids.css" media="screen" />
+    <link type="text/css" rel="stylesheet" href="https://www.bro.org/css/print.css" media="print" />
+    <!--[if lt IE 7]><link type="text/css" rel="stylesheet" href="css/ie6.css" media="screen" /><![endif]-->
+
+    <!--[if lt IE 7]><script src="https://ie7-js.googlecode.com/svn/version/2.1(beta4)/IE7.js"></script><![endif]-->
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+    <script type="text/javascript" src="https://www.bro.org/js/jquery.cycle.all.min.js"></script>
+    <script type="text/javascript" src="https://www.bro.org/js/jquery.fancybox-1.3.4.pack.js"></script>
+    <script type="text/javascript" src="https://www.bro.org/js/jquery.tweet.js"></script>
+    <script type="text/javascript" src="https://www.bro.org/js/jquery.zrssfeed.js"></script>
+    <script type="text/javascript" src="https://www.bro.org/js/jquery.tableofcontents.js" charset="utf-8"></script>
+
+    <script type="text/javascript" src="https://www.bro.org/js/superfish.js"></script>
+    <script type="text/javascript" src="https://www.bro.org/js/hoverIntent.js"></script>
+
+    <script type="text/javascript" src="https://www.bro.org/js/general.js"></script>
+    <!-- <link rel="shortcut icon" type="image/gif" href="./images/favicon.gif" /> -->
+
+    <base target="_parent" />
+
+</head>
+<!-- Oddly, we need to use variables here once to make
+     them available to the included code.
+
+     False
+     The Bro Network Security Monitor
+     No repo
+     No related links
+-->
+
+<body>
+    <div id="bro-outer" class="clearfix">
+
+        <!-- <div id="topbar" class="clearfix">
+</div> -->
+        <!-- False -->
+        <div id="header" class="clearfix">
+
+    <div class="container_16" id="header-container">
+
+        
+<!--
+    ( settings.cfg_blog_url,                 '',                'Blog',          () ),
+    ( docroot ~ '/contact/index.html',       '/contact/',       'Contact',       () ),
+-->
+
+<!-- docroot:    . -->
+<!-- docgroup:   /index.html -->
+<!-- docurl:     ./index.html -->
+
+<ul class="sf-menu sf-navbar">
+            <li><a href="https://www.bro.org/index.html">Home</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/download/index.html">Downloads</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/documentation/index.html">Documentation</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/support/index.html">Support</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/community/index.html">Community</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/development/index.html">Development</a>
+    
+                    <ul>
+
+                                                <li><a href="https://www.bro.org/development/index.html">Overview</a></li>
+                                                                <li><a href="https://github.com/bro">Git</a></li>
+                                                                <li><a href="https://tracker.bro.org">Issue Tracker</a></li>
+                            
+            </ul>
+        
+        </li>
+
+            <li><a href="https://www.bro.org/research/index.html">Research</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/contact/index.html">Contact</a>
+    
+        
+        </li>
+
+            <li><a href="https://www.bro.org/sitemap/index.html">Site Map</a>
+    
+        
+        </li>
+
+</ul>
+    </div>
+
+<!-- -->
+
+</div>
+
+        <div id="bro-main" class="clearfix">
+            <div id="bro-content" class="container_12">
+
+                <div class="grid_9 alpha">
+                
+                </div>
+
+                <div id="sidebar-toc-content" class="grid_9">
+                                        
+                    
+ 
+
+<img id="bro-eyes" src="https://www.bro.org/images/bro-eyes.png" alt="Bro Eyes" class="center" />
+
+
+
+<div id="bro-title">The Bro Network Security Monitor</div>
+
+
+
+<div class="grid_9 alpha omega">
+
+<p>
+
+<a href="https://www.bro.org/why_choose_bro.pdf">Why Choose Bro?</a> Bro is a 
+
+powerful network analysis framework that is much different from the typical 
+
+IDS you may know.
+
+</p>
+
+</div>
+
+
+
+<div class="grid_4 alpha">
+
+	<ul class="iconlist clean">
+
+
+
+	<li class="clearfix">
+
+	    <h5>Adaptable</h5>
+
+        <p>
+
+        Bro's domain-specific scripting language enables site-specific
+
+        monitoring policies.
+
+        </p>
+
+    </li>
+
+
+
+    <li class="clearfix">
+
+	    <h5>Efficient</h5>
+
+        <p>
+
+        Bro targets high-performance networks and is used
+
+        operationally at a variety of large sites.
+
+        </p>
+
+    </li>
+
+
+
+    <li class="clearfix">
+
+	    <h5>Flexible</h5>
+
+        <p>
+
+        Bro is not restricted to any particular detection approach and
+
+        does not rely on traditional signatures.
+
+        </p>
+
+    </li>
+
+
+
+	<li class="clearfix">
+
+	    <h5>Forensics</h5>
+
+        <p>
+
+        Bro comprehensively logs what it sees and provides a
+
+        high-level archive of a network's activity.
+
+        </p>
+
+    </li>
+
+
+
+	<li class="clearfix">
+
+	    <h5>Commercially Supported <!-- <img id="broala-new" src="images/new.png" alt="new"> --> </h5>
+
+        <p>
+
+        Broala provides enterprise-level support by
+
+        the creators of Bro.&nbsp; <a href="http://www.broala.com">More ...</a></p>
+
+    </li>
+
+
+
+	</ul>
+
+</div>
+
+
+
+<div class="grid_4 omega suffix_1">
+
+	<ul class="iconlist clean">
+
+
+
+    <li class="clearfix">
+
+	    <h5>In-depth Analysis</h5>
+
+        <p>
+
+        Bro comes with analyzers for many protocols, enabling high-level
+
+        semantic analysis at the application layer.
+
+        </p>
+
+        </li>
+
+
+
+	<li class="clearfix">
+
+	    <h5>Highly Stateful</h5>
+
+        <p>
+
+        Bro keeps extensive application-layer state about the network
+
+        it monitors.
+
+        </p>
+
+    </li>
+
+
+
+    <li class="clearfix">
+
+	    <h5>Open Interfaces</h5>
+
+        <p>
+
+        Bro interfaces with other applications for real-time exchange
+
+        of information.
+
+        </p>
+
+    </li>
+
+
+
+	<li class="clearfix">
+
+	    <h5>Open Source</h5>
+
+        <p>
+
+        Bro comes with a BSD license, allowing for free use with virtually
+
+        no restrictions.
+
+        </p>
+
+    </li>
+
+
+
+    </ul>
+
+</div>
+
+
+
+<div class="grid_9 alpha omega">
+
+<p>
+
+While focusing on network security monitoring, Bro provides a
+
+comprehensive platform for more general network traffic analysis as
+
+well. Well grounded in more than 15 years of research, Bro has
+
+successfully bridged the traditional gap between academia and
+
+operations since its inception. Today, it is relied upon operationally
+
+in particular by many scientific environments for securing their
+
+cyberinfrastructure. Bro's user community includes major universities,
+
+research labs, supercomputing centers, and open-science communities.
+
+</p>
+
+
+
+<p>
+
+Bro has originally been developed by Vern Paxson, who continues to
+
+lead the project now jointly with a core team of researchers and
+
+developers at
+
+the <a href="http://www.icsi.berkeley.edu">International Computer
+
+Science Institute</a> in Berkeley, CA; and the
+
+<a href="http://www.ncsa.illinois.edu">National Center for
+
+Supercomputing Applications</a> in Urbana-Champaign,
+
+IL.
+
+</p>
+
+</div>
+
+
+
+                </div>
+
+                <div class="grid_3 omega">
+                
+
+
+
+<div class="widget" id="quicklinks">
+    <h3 class="widgettitle">Quick Links</h3>
+    <div class="quicklinks-item">
+        <a href="https://www.bro.org/community/workshops.html">Events</a>
+        <ul>
+            <li>Aug 4&ndash;6: <a href="https://www.bro.org/community/brocon2015.html">BroCon '15</a></li>
+        </ul>
+    </div>
+
+    <div class="quicklinks-item">
+        <a class="quicklinks-item" href="https://www.youtube.com/user/BroPlatform">Bro YouTube channel</a>
+    </div>
+
+    <div class="quicklinks-item">
+        <a class="link-button" href="http://try.bro.org/#/trybro">Try Bro in your browser</a>
+    </div>
+</div>
+
+<div class="widget">
+    <h3 class="widgettitle" id="twittertitle">
+        Twitter
+        <span class="right">
+            <a href="https://twitter.com/Bro_IDS">@Bro_IDS</a>
+        </span>
+
+    </h3>
+    <small>
+    <a class="twitter-timeline"
+			 data-dnt="true" data-tweet-limit="2"
+			 width="280px"
+ 			 href="https://twitter.com/Bro_IDS" data-chrome="noheader nofooter noborders transparent noscrollbar"
+       data-widget-id="310783162055790592">Tweets by @Bro_IDS</a>
+    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+"://platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+
+    </small>
+</div>
+
+<div class="widget">
+    <h3 class="widgettitle">
+        Blog
+        <a class="right" href="http://blog.bro.org/feeds/posts/default"><img src="https://www.bro.org/images/icons/feed-icon-14x14.png" alt="Icon"/></a>
+    </h3>
+    <ul id="blog-rss"></ul>
+</div>
+
+<div class="widget">
+    <h3 class="widgettitle">Search</h3>
+    <div id="cse-search-form" style="width: 100%;">Loading</div>
+
+<script src="https://www.google.com/jsapi" type="text/javascript"></script>
+<script type="text/javascript"> 
+  google.load('search', '1', {language : 'en'});
+  google.setOnLoadCallback(function() {
+    var customSearchControl = new google.search.CustomSearchControl('015611371954953083749:vzkwg2ddham');
+    customSearchControl.setResultSetSize(google.search.Search.FILTERED_CSE_RESULTSET);
+    var options = new google.search.DrawOptions();
+    options.enableSearchboxOnly("//www.bro.org/search.html");
+    customSearchControl.draw('cse-search-form', options);
+  }, true);
+</script>
+<link rel="stylesheet" href="https://www.google.com/cse/style/look/default.css" type="text/css" />
+
+<style type="text/css">
+
+.cse .gsc-branding,
+.gsc-branding {
+  visibility: hidden;
+}
+
+input.gsc-search-button {
+    margin-left: 7px;
+    }
+
+</style></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    
+<div id="footer" class="clearfix">
+    <div class="container_12">
+
+        <div class="grid_2">
+            <div class="widget widget_links">
+                <h3 class="widgettitle">Resources</h3>
+                <ul>
+                    <li><a href="http://blog.bro.org">Blog</a></li>
+                    <li><a href="https://www.bro.org/contact/index.html">Contact</a></li>
+                    <li><a href="https://www.bro.org/nsf/index.html">Bro Center of Expertise</a></li>
+                    <li><a href="http://mailman.icsi.berkeley.edu/mailman/listinfo/bro-dev">Developer Mailing List</a></li>
+                    <li><a href="https://www.bro.org/download/index.html">Downloads</a></li>
+                    <li><a href="https://github.com/bro">Git Repositories</a></li>
+                    <li><a href="https://tracker.bro.org">Issue Tracker</a></li>
+                    <li><a href="http://mailman.icsi.berkeley.edu/mailman/listinfo/bro">User Mailing List</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="grid_4">
+            <div class="widget widget_links">
+                <h3 class="widgettitle">Related Projects</h3>
+                <ul>
+                    <li><a href="https://www.bro.org/community/time-machine.html">The Time Machine</a></li>
+                    <li><a href="http://notary.icsi.berkeley.edu">The ICSI Certificate Notary</a></li>
+                </ul>
+            </div>
+
+
+            <div class="widget widget_links">
+                <h3 class="widgettitle">Related Sites</h3>
+                <ul>
+                    <li><a href="http://www.icsi.berkeley.edu">International Computer Science Institute</a></li>
+                    <li><a href="http://www.icir.org">Networking Group at ICSI</a></li>
+                    <li><a href="http://www.ncsa.illinois.edu">National Center for Supercomputing Applications</a></li>
+                    <li><a href="http://security.ncsa.illinois.edu">Security Group at NCSA</a></li>
+                </ul>
+            </div>
+
+        </div>
+
+        <div class="grid_2">
+            <div class="widget widget_links">
+                <h3 class="widgettitle">Team</h3>
+                <ul>
+                    <li><a href="http://www.icir.org/vern">Vern Paxson</a></li>
+                    <li><a href="http://www.icir.org/johanna">Johanna Amann</a></li>
+                    <li>Justin Azoff</li>
+                    <li>Jeannette Dopheide</li>
+                    <li>Vlad Grigorescu</li>
+                    <li><a href="http://www.icir.org/seth">Seth Hall</a></li>
+                    <li>Doris Schi&ouml;berg</li>
+                    <li>Jonathan Schipp</li>
+                    <li>Aashish Sharma</li>
+                    <li>Jonathan Siwek</li>
+                    <li><a href="http://www.slagell.info">Adam Slagell</a></li>
+                    <li><a href="http://www.icir.org/robin">Robin Sommer</a></li>
+                    <li>Daniel Thayer</li>
+                    <li><a href="http://matthias.vallentin.net/">Matthias Vallentin</a></li>
+                </ul>
+            </div>
+        </div>
+
+
+        <div class="grid_4">
+            <div class="widget widget_links">
+                <h3 class="widgettitle">Funding</h3>
+                <ul>
+                    <li><a href="http://www.nsf.gov/awardsearch/showAward.do?AwardNumber=1032889">National Science Foundation  Award ACI-1032889</a></li>
+                    <li><a href="http://www.nsf.gov/awardsearch/showAward?AWD_ID=1348077">National Science Foundation  Award ACI-1348077</a></li>
+                </ul>
+            </div>
+
+            <div class="widget widget_links">
+                <h3 class="widgettitle">Sponsors</h3>
+                <ul>
+                    <li><a href="http://www.icsi.berkeley.edu">International Computer Science Institute</a></li>
+                    <li><a href="http://www.lbl.gov">Lawrence Berkeley National Laboratory</a></li>
+                    <li><a href="http://www.ncsa.illinois.edu">National Center for Supercomputing Applications</a></li>
+                    <li><a href="http://www.nsf.gov">National Science Foundation</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="footer-bottom" class="clearfix">
+    <div class="container_12">
+        <div class="grid_12">
+		<p class="left">&copy; 2014 The Bro Project.</p>
+            <p class="right"><a href="https://www.bro.org/internal/index.html">Internal Pages</a></p>
+        </div>
+        <div class="grid_12">
+            <p class="right"><a href="index.html#" class="scroll-top" title="Back to the Top">TOP</a></p>
+        </div>
+    </div>
+</div></body>
+</html>
