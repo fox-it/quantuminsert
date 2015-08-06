@@ -7,7 +7,9 @@ The README and the old policy utilizing the `tcp_packet` event can still be foun
 
 The patch was made for the latest stable version, `bro-2.3.2` and can be found here: [rexmit_inconsistency-bro-2.3.2.patch](./rexmit_inconsistency-bro-2.3.2.patch)
 
-We hope it will be patched upstream as well.
+~~We hope it will be patched upstream as well.~~
+
+The patch has been merged in https://github.com/bro/bro/commit/c1f060be63ad72d37b37e5649887d4c047c116e1 on 28 June 2015.
 
 Patch for `rexmit_inconsistency`
 --------------------------------
@@ -74,3 +76,4 @@ References
 
  * https://bro-tracker.atlassian.net/browse/BIT-1314
  * http://mailman.icsi.berkeley.edu/pipermail/bro/2014-July/007141.html
+ * https://github.com/bro/bro/commit/c1f060be63ad72d37b37e5649887d4c047c116e1
