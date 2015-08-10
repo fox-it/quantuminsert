@@ -32,9 +32,15 @@ event tcp_packet (c: connection, is_orig: bool, flags: string, seq: count, ack: 
 
     # check if we receive a packet with duplicate sequence numbers (only track the last seq)
     if (c?$last_payload && seq == c$last_seq) {
-        local other_payload = payload;
         local last_payload = c$last_payload;
         local last_len = |last_payload|;
+
+        # if payloads are of equal length then this is a false positive more than likely so exit
+        if (last_len == len) {
+            return;
+        } else {
+            local other_payload = payload;
+        }
 
         # one side of the payload can be smaller, so only compare the smallest.
         if (last_len < len) {
