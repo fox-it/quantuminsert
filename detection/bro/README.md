@@ -5,7 +5,10 @@ Fox-IT made a proof of concept policy for Bro-IDS to detect `QUANTUMINSERT` atta
 
 The README and the old policy utilizing the `tcp_packet` event can still be found [here](./old).
 
-The patch was made for the latest stable version, `bro-2.3.2` and can be found here: [rexmit_inconsistency-bro-2.3.2.patch](./rexmit_inconsistency-bro-2.3.2.patch)
+Patches are available for following stable Bro versions:
+
+ * `bro-2.4.1`: [rexmit_inconsistency-bro-2.4.1.patch](./rexmit_inconsistency-bro-2.4.1.patch)
+ * `bro-2.3.2`: [rexmit_inconsistency-bro-2.3.2.patch](./rexmit_inconsistency-bro-2.3.2.patch)
 
 ~~We hope it will be patched upstream as well.~~
 

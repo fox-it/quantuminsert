@@ -1,0 +1,262 @@
+diff --git a/scripts/base/init-bare.bro b/scripts/base/init-bare.bro
+index 4353c9c..b0115f5 100644
+--- a/scripts/base/init-bare.bro
++++ b/scripts/base/init-bare.bro
+@@ -954,6 +954,11 @@ const tcp_max_above_hole_without_any_acks = 16384 &redef;
+ ## .. bro:see:: tcp_max_initial_window tcp_max_above_hole_without_any_acks
+ const tcp_excessive_data_without_further_acks = 10 * 1024 * 1024 &redef;
+ 
++## Number of TCP segments to buffer beyond what's been acknowledged already
++## to detect retransmission inconsistencies. Zero disables any additonal
++## buffering.
++const tcp_max_old_segments = 0 &redef;
++
+ ## For services without a handler, these sets define originator-side ports
+ ## that still trigger reassembly.
+ ##
+diff --git a/src/NetVar.cc b/src/NetVar.cc
+index 123e947..dc04900 100644
+--- a/src/NetVar.cc
++++ b/src/NetVar.cc
+@@ -49,6 +49,7 @@ double tcp_partial_close_delay;
+ int tcp_max_initial_window;
+ int tcp_max_above_hole_without_any_acks;
+ int tcp_excessive_data_without_further_acks;
++int tcp_max_old_segments;
+ 
+ RecordType* socks_address;
+ 
+@@ -354,6 +355,7 @@ void init_net_var()
+ 		opt_internal_int("tcp_max_above_hole_without_any_acks");
+ 	tcp_excessive_data_without_further_acks =
+ 		opt_internal_int("tcp_excessive_data_without_further_acks");
++	tcp_max_old_segments = opt_internal_int("tcp_max_old_segments");
+ 
+ 	socks_address = internal_type("SOCKS::Address")->AsRecordType();
+ 
+diff --git a/src/NetVar.h b/src/NetVar.h
+index bf2d9a5..efadaaa 100644
+--- a/src/NetVar.h
++++ b/src/NetVar.h
+@@ -52,6 +52,7 @@ extern double tcp_reset_delay;
+ extern int tcp_max_initial_window;
+ extern int tcp_max_above_hole_without_any_acks;
+ extern int tcp_excessive_data_without_further_acks;
++extern int tcp_max_old_segments;
+ 
+ extern RecordType* socks_address;
+ 
+diff --git a/src/Reassem.cc b/src/Reassem.cc
+index 8bf9654..2ab8c1f 100644
+--- a/src/Reassem.cc
++++ b/src/Reassem.cc
+@@ -34,12 +34,51 @@ uint64 Reassembler::total_size = 0;
+ Reassembler::Reassembler(uint64 init_seq)
+ 	{
+ 	blocks = last_block = 0;
++	old_blocks = last_old_block = 0;
++	total_old_blocks = max_old_blocks = 0;
+ 	trim_seq = last_reassem_seq = init_seq;
+ 	}
+ 
+ Reassembler::~Reassembler()
+ 	{
+ 	ClearBlocks();
++	ClearOldBlocks();
++	}
++
++void Reassembler::CheckOverlap(DataBlock *head, DataBlock *tail,
++					uint64 seq, uint64 len, const u_char* data)
++	{
++	if ( ! head || ! tail )
++		return;
++
++	uint64 upper = (seq + len);
++
++	for ( DataBlock* b = head; b; b = b->next )
++		{
++		uint64 nseq = seq;
++		uint64 nupper = upper;
++		const u_char* ndata = data;
++
++		if ( nupper <= b->seq )
++			continue;
++
++		if ( nseq >= b->upper )
++			continue;
++
++		if ( nseq < b->seq )
++			{
++			ndata += (b->seq - seq);
++			nseq = b->seq;
++			}
++
++		if ( nupper > b->upper )
++			nupper = b->upper;
++
++		uint64 overlap_offset = (nseq - b->seq);
++		uint64 overlap_len = (nupper - nseq);
++		if ( overlap_len )
++			Overlap(&b->block[overlap_offset], ndata, overlap_len);
++		}
+ 	}
+ 
+ void Reassembler::NewBlock(double t, uint64 seq, uint64 len, const u_char* data)
+@@ -49,10 +88,14 @@ void Reassembler::NewBlock(double t, uint64 seq, uint64 len, const u_char* data)
+ 
+ 	uint64 upper_seq = seq + len;
+ 
++	CheckOverlap(old_blocks, last_old_block, seq, len, data);
++
+ 	if ( upper_seq <= trim_seq )
+ 		// Old data, don't do any work for it.
+ 		return;
+ 
++	CheckOverlap(blocks, last_block, seq, len, data);
++
+ 	if ( seq < trim_seq )
+ 		{ // Partially old data, just keep the good stuff.
+ 		uint64 amount_old = trim_seq - seq;
+@@ -119,7 +162,36 @@ uint64 Reassembler::TrimToSeq(uint64 seq)
+ 				num_missing += seq - blocks->upper;
+ 			}
+ 
+-		delete blocks;
++		if ( max_old_blocks )
++			{
++			// Move block over to old_blocks queue.
++			blocks->next = 0;
++
++			if ( last_old_block )
++				{
++				blocks->prev = last_old_block;
++				last_old_block->next = blocks;
++				}
++			else
++				{
++				blocks->prev = 0;
++				old_blocks = blocks;
++				}
++
++			last_old_block = blocks;
++			total_old_blocks++;
++
++			while ( old_blocks && total_old_blocks > max_old_blocks )
++				{
++				DataBlock* next = old_blocks->next;
++				delete old_blocks;
++				old_blocks = next;
++				total_old_blocks--;
++				}
++			}
++
++		else
++			delete blocks;
+ 
+ 		blocks = b;
+ 		}
+@@ -156,6 +228,18 @@ void Reassembler::ClearBlocks()
+ 	last_block = 0;
+ 	}
+ 
++void Reassembler::ClearOldBlocks()
++	{
++	while ( old_blocks )
++		{
++		DataBlock* b = old_blocks->next;
++		delete old_blocks;
++		old_blocks = b;
++		}
++
++	last_old_block = 0;
++	}
++
+ uint64 Reassembler::TotalSize() const
+ 	{
+ 	uint64 size = 0;
+@@ -218,7 +302,7 @@ DataBlock* Reassembler::AddAndCheck(DataBlock* b, uint64 seq, uint64 upper,
+ 		return new_b;
+ 		}
+ 
+-	// The blocks overlap, complain.
++	// The blocks overlap.
+ 	if ( seq < b->seq )
+ 		{
+ 		// The new block has a prefix that comes before b.
+@@ -239,8 +323,6 @@ DataBlock* Reassembler::AddAndCheck(DataBlock* b, uint64 seq, uint64 upper,
+ 	uint64 b_len = b->upper - overlap_start;
+ 	uint64 overlap_len = min(new_b_len, b_len);
+ 
+-	Overlap(&b->block[overlap_offset], data, overlap_len);
+-
+ 	if ( overlap_len < new_b_len )
+ 		{
+ 		// Recurse to resolve remainder of the new data.
+diff --git a/src/Reassem.h b/src/Reassem.h
+index 39617f7..943cd15 100644
+--- a/src/Reassem.h
++++ b/src/Reassem.h
+@@ -36,6 +36,7 @@ public:
+ 
+ 	// Delete all held blocks.
+ 	void ClearBlocks();
++	void ClearOldBlocks();
+ 
+ 	int HasBlocks() const		{ return blocks != 0; }
+ 	uint64 LastReassemSeq() const	{ return last_reassem_seq; }
+@@ -49,6 +50,7 @@ public:
+ 
+ 	// Sum over all data buffered in some reassembler.
+ 	static uint64 TotalMemoryAllocation()	{ return total_size; }
++	void SetMaxOldBlocks(uint32 count)		{ max_old_blocks = count; }
+ 
+ protected:
+ 	Reassembler()	{ }
+@@ -64,11 +66,19 @@ protected:
+ 
+ 	DataBlock* AddAndCheck(DataBlock* b, uint64 seq,
+ 				uint64 upper, const u_char* data);
++	void CheckOverlap(DataBlock *head, DataBlock *tail,
++				uint64 seq, uint64 len, const u_char* data);
+ 
+ 	DataBlock* blocks;
+ 	DataBlock* last_block;
++
++	DataBlock* old_blocks;
++	DataBlock* last_old_block;
++
+ 	uint64 last_reassem_seq;
+ 	uint64 trim_seq;	// how far we've trimmed
++	uint32 max_old_blocks;
++	uint32 total_old_blocks;
+ 
+ 	static uint64 total_size;
+ };
+diff --git a/src/analyzer/protocol/tcp/TCP_Reassembler.cc b/src/analyzer/protocol/tcp/TCP_Reassembler.cc
+index 16bb9cc..bbcd9cb 100644
+--- a/src/analyzer/protocol/tcp/TCP_Reassembler.cc
++++ b/src/analyzer/protocol/tcp/TCP_Reassembler.cc
+@@ -42,6 +42,9 @@ TCP_Reassembler::TCP_Reassembler(analyzer::Analyzer* arg_dst_analyzer,
+ 	seq_to_skip = 0;
+ 	in_delivery = false;
+ 
++	if ( tcp_max_old_segments )
++		SetMaxOldBlocks(tcp_max_old_segments);
++
+ 	if ( tcp_contents )
+ 		{
+ 		// Val dst_port_val(ntohs(Conn()->RespPort()), TYPE_PORT);
+diff --git a/src/event.bif b/src/event.bif
+index 6531bef..dc6388f 100644
+--- a/src/event.bif
++++ b/src/event.bif
+@@ -282,7 +282,8 @@ event packet_contents%(c: connection, contents: string%);
+ ## reassembling a TCP stream, Bro buffers all payload until it sees the
+ ## responder acking it. If during that time, the sender resends a chunk of
+ ## payload but with different content than originally, this event will be
+-## raised.
++## raised. In addition, if :bro:id:`tcp_max_old_segments` is larger than zero,
++## mismatches with that older still-buffered data will likewise trigger the event.
+ ##
+ ## c: The connection showing the inconsistency.
+ ##
