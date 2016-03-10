@@ -21,9 +21,9 @@ The information is sent to the shooter using a single UDP packet. However, one c
 
 #### Example usage for tcpdump
 
-	stdbuf --output=0 |	tcpdump -nn -i eth0 "host jsonip.com and tcp[tcpflags]=(tcp-syn|tcp-ack)" | python monitor.py -s 10.0.0.2
+	stdbuf --output=0 |	tcpdump -nn -i eth0 "host jsonip.com and tcp[tcpflags]=(tcp-syn|tcp-ack)" | python monitor.py -s 10.0.0.2 -p 12345
 	
-`stdbuf` is needed as `tcpdump` will buffer it's output by default. The bpf filter ensures that we only see the SYN+ACK of `jsonip.com`, which will be printed to stdout and parsed by `monitor.py`. The shooter is then notified on `10.0.0.2`.
+`stdbuf` is needed as `tcpdump` will buffer it's output by default. The bpf filter ensures that we only see the SYN+ACK of `jsonip.com`, which will be printed to stdout and parsed by `monitor.py`. The shooter is then notified at `10.0.0.2` running on port `12345`.
 
 #### Example usage for tshark
 
@@ -36,7 +36,7 @@ Example command:
 		-e ip.src -e tcp.srcport -e ip.dst -e tcp.dstport \
 		-e tcp.analysis.bytes_in_flight -e http.host -e 'http.cookie' \
 		-o tcp.relative_sequence_numbers:0 -R http.request \
-		'host jsonip.com and port 80' | python monitor.py -s 10.0.0.2 --tshark
+		'host jsonip.com and port 80' | python monitor.py -s 10.0.0.2 -p 12345 --tshark
 		
 This command will output the required fields when someone makes a HTTP request to `jsonip.com`. The outputted cookie and host fields could be used as selectors in the monitor script.
 
