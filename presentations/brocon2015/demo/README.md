@@ -14,7 +14,7 @@ shooter
 The modifications allow for sending multiple QI packets to account for MTU.
 Also supports compressing the HTML page and injecting a javascript file.
 
-``python shooter.py index.html --inject inject.js``
+``python shooter.py --response index.html --inject inject.js``
 
 index.html
 ----------
