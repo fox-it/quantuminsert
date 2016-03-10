@@ -26,7 +26,7 @@ The tools that we used to simulate and perform `QUANTUMINSERT` can be found here
 
 [https://github.com/fox-it/quantuminsert/tree/master/poc](https://github.com/fox-it/quantuminsert/tree/master/poc)
 
-The modified scripts that where used to perform the Harlem Shake QI demo at BroCon2015:
+The modified scripts that were used to perform the Harlem Shake QI demo at BroCon2015:
 
 [https://github.com/fox-it/quantuminsert/tree/master/presentations/brocon2015/demo](https://github.com/fox-it/quantuminsert/tree/master/presentations/brocon2015/demo)
 
